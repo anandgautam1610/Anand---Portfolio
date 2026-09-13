@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
    1. Theme Toggle & Persistence
    ========================================================================== */
 function initTheme() {
-  const themeToggleBtn = document.getElementById('theme-toggle');
+  const themeToggleBtns = document.querySelectorAll('.theme-toggle-btn');
   const root = document.documentElement;
   const THEME_STORAGE_KEY = 'anand_portfolio_theme';
 
@@ -40,13 +40,13 @@ function initTheme() {
 
   applyTheme(currentTheme);
 
-  if (themeToggleBtn) {
-    themeToggleBtn.addEventListener('click', () => {
+  themeToggleBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
       const activeTheme = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
       applyTheme(activeTheme);
       localStorage.setItem(THEME_STORAGE_KEY, activeTheme);
     });
-  }
+  });
 
   // Sync with OS theme changes if user has not set an explicit override
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
@@ -57,10 +57,10 @@ function initTheme() {
 
   function applyTheme(theme) {
     root.setAttribute('data-theme', theme);
-    if (themeToggleBtn) {
-      themeToggleBtn.setAttribute('title', `Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`);
-      themeToggleBtn.setAttribute('aria-label', `Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`);
-    }
+    themeToggleBtns.forEach((btn) => {
+      btn.setAttribute('title', `Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`);
+      btn.setAttribute('aria-label', `Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`);
+    });
   }
 }
 
@@ -70,7 +70,7 @@ function initTheme() {
 function initNavigation() {
   const mobileToggle = document.getElementById('mobile-toggle');
   const mobileNav = document.getElementById('mobile-nav');
-  const mobileLinks = document.querySelectorAll('.mobile-nav-link, .mobile-cta-btn');
+  const mobileLinks = mobileNav ? mobileNav.querySelectorAll('a') : [];
 
   if (!mobileToggle || !mobileNav) return;
 
@@ -84,7 +84,7 @@ function initNavigation() {
 
   mobileToggle.addEventListener('click', () => toggleMobileMenu());
 
-  // Close when clicking any nav link
+  // Close when clicking any link in mobile drawer
   mobileLinks.forEach((link) => {
     link.addEventListener('click', () => {
       toggleMobileMenu(false);
@@ -364,6 +364,7 @@ function initContactForm() {
   const emailInput = document.getElementById('form-email');
   const messageInput = document.getElementById('form-message');
   const submitBtn = document.getElementById('contact-submit-btn');
+  const formStatus = document.getElementById('form-status');
 
   const nameError = document.getElementById('name-error');
   const emailError = document.getElementById('email-error');
@@ -386,6 +387,21 @@ function initContactForm() {
     if (errorEl) errorEl.textContent = message;
   }
 
+  function showInlineStatus(type, message) {
+    if (!formStatus) return;
+    formStatus.className = `form-status-msg ${type}`;
+    formStatus.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
+        ${type === 'success' 
+          ? '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>'
+          : '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>'
+        }
+      </svg>
+      <span>${message}</span>
+    `;
+    formStatus.style.display = 'flex';
+  }
+
   // Live input cleanup on user typing
   [nameInput, emailInput, messageInput].forEach((input) => {
     if (!input) return;
@@ -393,10 +409,11 @@ function initContactForm() {
       if (input === nameInput) clearError(nameInput, nameError);
       if (input === emailInput) clearError(emailInput, emailError);
       if (input === messageInput) clearError(messageInput, messageError);
+      if (formStatus) formStatus.style.display = 'none';
     });
   });
 
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     let isValid = true;
@@ -413,7 +430,7 @@ function initContactForm() {
       clearError(nameInput, nameError);
     }
 
-    // Validate Email
+    // Validate Email (_replyto)
     const emailVal = emailInput ? emailInput.value.trim() : '';
     if (!emailVal) {
       setError(emailInput, emailError, 'Please enter your email address.');
@@ -439,24 +456,67 @@ function initContactForm() {
 
     if (!isValid) return;
 
-    // Simulate submission state
+    // Reset previous status
+    if (formStatus) {
+      formStatus.style.display = 'none';
+      formStatus.textContent = '';
+    }
+
+    // Set loading state on submit button
     if (submitBtn) {
       submitBtn.classList.add('loading');
       submitBtn.disabled = true;
     }
 
-    setTimeout(() => {
+    const formAction = form.getAttribute('action') || 'https://formspree.io/f/YOUR_FORM_ID_HERE';
+
+    // Check if form is still using the placeholder Formspree ID
+    if (formAction.includes('YOUR_FORM_ID_HERE')) {
+      setTimeout(() => {
+        if (submitBtn) {
+          submitBtn.classList.remove('loading');
+          submitBtn.disabled = false;
+        }
+        form.reset();
+        showInlineStatus('success', 'Thanks! Your message has been sent. (Replace YOUR_FORM_ID_HERE in index.html with your Formspree ID to receive emails)');
+        showToast('Message Sent!', 'Thanks! Your message has been sent.');
+      }, 850);
+      return;
+    }
+
+    // Working Formspree AJAX Submission
+    try {
+      const formData = new FormData(form);
+      const response = await fetch(formAction, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        form.reset();
+        showInlineStatus('success', 'Thanks! Your message has been sent.');
+        showToast('Message Sent!', 'Thanks! Your message has been sent.');
+      } else {
+        const data = await response.json().catch(() => ({}));
+        let errorMsg = 'Oops! There was a problem submitting your form.';
+        if (data && data.errors && data.errors.length) {
+          errorMsg = data.errors.map(err => err.message).join(', ');
+        }
+        showInlineStatus('error', errorMsg);
+        showToast('Submission Failed', errorMsg);
+      }
+    } catch (err) {
+      showInlineStatus('error', 'Oops! Network error. Please check your internet connection or try again.');
+      showToast('Network Error', 'Could not reach Formspree. Please try again.');
+    } finally {
       if (submitBtn) {
         submitBtn.classList.remove('loading');
         submitBtn.disabled = false;
       }
-
-      // Reset form fields
-      form.reset();
-
-      // Show toast notification
-      showToast('Message Sent Successfully!', `Thank you ${nameVal}, Anand will respond to your message shortly.`);
-    }, 1100);
+    }
   });
 }
 
