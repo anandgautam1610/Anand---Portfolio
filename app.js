@@ -546,3 +546,4 @@ function initFooterYear() {
     yearEl.textContent = new Date().getFullYear();
   }
 }
+
