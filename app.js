@@ -28,14 +28,14 @@ function initTheme() {
   const root = document.documentElement;
   const THEME_STORAGE_KEY = 'anand_portfolio_theme';
 
-  // Determine initial theme: saved preference -> system preference -> default dark
+  // Determine initial theme: saved preference -> system preference -> default light (notebook)
   const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
-  let currentTheme = 'dark';
+  let currentTheme = 'light';
 
   if (savedTheme) {
     currentTheme = savedTheme;
-  } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
-    currentTheme = 'light';
+  } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    currentTheme = 'dark';
   }
 
   applyTheme(currentTheme);
